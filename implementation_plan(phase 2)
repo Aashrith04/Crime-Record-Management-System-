@@ -1,0 +1,196 @@
+# Phase 2: Enterprise Business Modules Implementation Plan
+
+Transform the Crime Record Management System (CRMS) into a production-grade enterprise application by implementing all 11 business modules completely with zero placeholders, full RBAC protection, complete CRUD, backend repository pattern, service layer, audit logging, and modern responsive UI with dark theme aesthetics.
+
+---
+
+## Technical Architecture & Design Strategy
+
+### Backend Design Patterns
+1. **Repository Pattern**: Decouple data access logic into explicit repository classes inheriting from `BaseRepository`.
+2. **Service Layer**: Business logic, multi-entity orchestration, transaction management, and permission validation in dedicated service classes (`CrimeService`, `FIRService`, `CriminalService`, `EvidenceService`, `InvestigationService`, `OfficerService`, `AnalyticsService`, `AuditLogService`).
+3. **Audit Logging Integration**: Automatic audit logging for all mutation actions (`CREATE`, `UPDATE`, `DELETE`, `SOFT_DELETE`, `RESTORE`, `ASSIGNMENT`, `EVIDENCE_UPLOAD`, `FIR_GENERATION`).
+4. **Validation & Exception Handling**: Pydantic v2 schemas (`ConfigDict(from_attributes=True)`), clear HTTP exception handlers, and standard pagination wrappers.
+
+### Frontend Architecture
+1. **Reusable UI Components**: Data tables, search inputs, status badges, priority/severity chips, modal dialogs, drawer forms, loading skeletons, error fallbacks, and empty states.
+2. **API Client & State**: Modular TypeScript API service functions wrapping `api.ts` with toast notification feedback (`react-hot-toast` / custom toasts).
+3. **Responsive Dark Mode UI**: Consistent sleek dark-mode glassmorphism theme using Tailwind CSS and Lucide icons.
+
+---
+
+## 11 Business Modules Breakdown
+
+### 1. Crime Records Module (`/crimes`, `/crimes/[id]`)
+- **Backend**:
+  - Soft-delete support (`is_deleted`, `deleted_at`), restore endpoint (`POST /crimes/{id}/restore`).
+  - Crime assignment (`POST /crimes/{id}/assign`), status/priority/severity patch endpoints.
+  - Complete timeline generation (`CrimeTimeline` audit trail).
+  - Search by crime number/title/description, filter by `crime_type`, `status`, `priority`, `severity`, date range.
+- **Frontend**:
+  - Full CRUD UI with loading skeletons, confirmation modals, drawer forms.
+  - Detailed view with Crime Timeline, assigned officer panel, linked FIR, evidence gallery, linked suspects, victims, witnesses, and investigation status.
+
+### 2. FIR Registry (`/firs`, `/firs/[id]`)
+- **Backend**:
+  - FIR CRUD, crime linking, unique `FIR-YYYY-XXXX` auto-generation.
+  - PDF generation service (`reportlab` integration) for instant FIR PDF download (`GET /firs/{id}/pdf`).
+  - Search, status workflow (`Registered` -> `Under Review` -> `Verified` -> `Closed`).
+- **Frontend**:
+  - FIR table, filter by IPC section/status, create/edit modal.
+  - "Print FIR" / "Download PDF" view formatted as official police report document.
+
+### 3. Criminal Profiles (`/criminals`, `/criminals/[id]`)
+- **Backend**:
+  - Criminal profile CRUD (Name, alias, photo URL, DOB, gender, address, identification marks, risk/wanted status).
+  - Crime association (`CrimeCriminal` pivot table: Suspect, Accomplice, Convicted).
+  - Risk level scoring (Low, Medium, High, Critical) and associates listing.
+- **Frontend**:
+  - Mugshot gallery & grid/list views, risk status indicators, crime history timeline.
+
+### 4. Victims Module (`/victims`)
+- **Backend**:
+  - Victim CRUD linked to crimes, emergency contact details, statement recording, medical report attachment.
+- **Frontend**:
+  - Linked victims panel within Crime Details + standalone Victim Directory with search & emergency contact modal.
+
+### 5. Witnesses Module (`/witnesses`)
+- **Backend**:
+  - Witness CRUD linked to crimes, protected witness flag (`is_protected`), statement recording, contact shielding for RBAC.
+- **Frontend**:
+  - Protected witness UI badge, statement recorder, linking modal.
+
+### 6. Evidence Locker (`/evidence`, `/evidence/[id]`)
+- **Backend**:
+  - Multi-media upload (Images, PDF, Video, Audio) via Cloudinary/Local storage fallback.
+  - Evidence metadata, unique Barcode/Evidence ID (`EVD-YYYY-XXXX`), storage locker/shelf location, status (`In Locker`, `In Lab`, `Court Presentation`, `Disposed`).
+  - Chain of custody movement logs (`EvidenceChainOfCustody` table).
+- **Frontend**:
+  - Interactive Evidence Locker board with file previews (lightbox for images, embedded PDF viewer, HTML5 video player).
+  - Barcode badge, chain of custody movement modal.
+
+### 7. Investigation Module (`/investigations`, `/investigations/[id]`)
+- **Backend**:
+  - Case assignment, Lead Officer + Supporting Officers mapping.
+  - Case Diary entry log (`CaseDiary`), investigation progress percentage, target deadlines, status transitions (`In Progress`, `Pending Chargesheet`, `Closed`, `Cold Case`).
+- **Frontend**:
+  - Investigation Kanban / Case Diary timeline, officer assignment drawer, deadline tracker.
+
+### 8. Officer Management (`/officers`, `/officers/[id]`)
+- **Backend**:
+  - Officer profiles (User entity extended with rank, station, badge number, active cases count, performance score).
+  - Officer workload query, availability status, active case load assignment check.
+- **Frontend**:
+  - Police Roster view, workload metrics, assigned crimes drawer, performance indicator.
+
+### 9. GIS Crime Map (`/map`)
+- **Backend**:
+  - Spatial spatial query endpoints `GET /api/v1/map/crimes` returning GeoJSON markers with location, category, severity, status.
+- **Frontend**:
+  - Leaflet / Mapbox interactive dark-tile map with crime clusters, category filters, heatmap overlay toggle, popup card with direct navigation link to Crime Details.
+
+### 10. Real Analytics (`/analytics`)
+- **Backend**:
+  - Analytics aggregations: Crime trends over time (monthly/weekly), Crime type distribution, Severity breakdown, Resolution rate, Station performance metrics, Officer resolution times.
+- **Frontend**:
+  - Comprehensive Analytics Dashboard powered by Recharts (Bar, Line, Pie, Radar charts) with date range filter and export capability.
+
+### 11. Enterprise Audit Logs (`/logs`)
+- **Backend**:
+  - AuditLog query endpoint with filter by action type, entity, user, date range, IP address, and CSV export.
+- **Frontend**:
+  - Filterable system activity stream with IP address, user badges, action category tags, and JSON payload inspector modal.
+
+---
+
+## Database Schema Enhancements
+
+To support Chain of Custody and Supporting Officers cleanly:
+1. `EvidenceChainOfCustody`: `id`, `evidence_id`, `moved_from`, `moved_to`, `reason`, `moved_by_id`, `timestamp`.
+2. `InvestigationOfficer`: `id`, `investigation_id`, `officer_id`, `role` (Lead / Supporting).
+
+Alembic migration script `add_phase2_tables.py` will be generated and executed to update SQLite/PostgreSQL cleanly without dropping existing data.
+
+---
+
+## Proposed File Changes
+
+### Backend Components
+
+#### [NEW] [evidence_custody.py](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/backend/app/models/evidence_custody.py)
+Model for `EvidenceChainOfCustody`.
+
+#### [MODIFY] [crime.py](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/backend/app/models/crime.py)
+Add soft delete `is_deleted` column and `deleted_at` timestamp.
+
+#### [NEW] [criminal_repository.py](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/backend/app/repositories/criminal_repository.py)
+#### [NEW] [evidence_repository.py](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/backend/app/repositories/evidence_repository.py)
+#### [NEW] [fir_repository.py](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/backend/app/repositories/fir_repository.py)
+#### [NEW] [investigation_repository.py](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/backend/app/repositories/investigation_repository.py)
+#### [NEW] [victim_witness_repository.py](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/backend/app/repositories/victim_witness_repository.py)
+
+#### [NEW] [crime_service.py](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/backend/app/services/crime_service.py)
+#### [NEW] [fir_service.py](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/backend/app/services/fir_service.py)
+#### [NEW] [criminal_service.py](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/backend/app/services/criminal_service.py)
+#### [NEW] [evidence_service.py](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/backend/app/services/evidence_service.py)
+#### [NEW] [investigation_service.py](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/backend/app/services/investigation_service.py)
+#### [NEW] [officer_service.py](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/backend/app/services/officer_service.py)
+#### [NEW] [pdf_service.py](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/backend/app/services/pdf_service.py)
+
+#### [NEW] [criminals.py](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/backend/app/api/criminals.py)
+#### [NEW] [evidences.py](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/backend/app/api/evidences.py)
+#### [NEW] [investigations.py](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/backend/app/api/investigations.py)
+#### [NEW] [officers.py](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/backend/app/api/officers.py)
+#### [NEW] [victims_witnesses.py](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/backend/app/api/victims_witnesses.py)
+#### [NEW] [map.py](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/backend/app/api/map.py)
+
+#### [MODIFY] [router.py](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/backend/app/api/router.py)
+Register all new API endpoints into the main API router.
+
+---
+
+### Frontend Components & Pages
+
+#### [NEW] [criminals/page.tsx](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/frontend/src/app/\(dashboard\)/criminals/page.tsx)
+Criminal Profiles grid, search, risk status filter, create/edit modal.
+
+#### [NEW] [criminals/[id]/page.tsx](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/frontend/src/app/\(dashboard\)/criminals/[id]/page.tsx)
+Criminal profile view, mugshot, aliases, linked crimes, associates.
+
+#### [NEW] [evidence/page.tsx](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/frontend/src/app/\(dashboard\)/evidence/page.tsx)
+Evidence Locker, file upload dropzone, previews, chain of custody modal.
+
+#### [NEW] [investigations/page.tsx](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/frontend/src/app/\(dashboard\)/investigations/page.tsx)
+Case diary management, lead officer assignment, progress tracker.
+
+#### [NEW] [officers/page.tsx](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/frontend/src/app/\(dashboard\)/officers/page.tsx)
+Officer Directory, station filter, workload score cards.
+
+#### [NEW] [victims-witnesses/page.tsx](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/frontend/src/app/\(dashboard\)/victims-witnesses/page.tsx)
+Victims & Witnesses registry, protected status flag, statement view.
+
+#### [MODIFY] [crimes/[id]/page.tsx](file:///c:/Users/Aashrith/OneDrive/Aashrith/Webs/Crime%20Record%20managament/frontend/src/app/\(dashboard\)/crimes/[id]/page.tsx)
+Crime Details page with full tabbed view (Overview, Timeline, FIR, Evidences, Investigation, Criminals, Victims/Witnesses).
+
+---
+
+## Verification Plan
+
+### Automated Verification
+1. Backend Startup & Endpoint Verification:
+   - Run `python -m app.main` or `pytest` to ensure all API endpoints compile and startup cleanly.
+2. Database Verification:
+   - Verify DB table creation & migration execution via Python scripts.
+3. Frontend Build Verification:
+   - Run `npm run build` inside `frontend/` to confirm zero TypeScript compile or Next.js route errors.
+
+### Manual Verification
+1. Verify Crime CRUD, assignment, status update, timeline, soft-delete, and restore.
+2. Verify FIR generation, link to crime, and PDF report download.
+3. Verify Criminal profile creation, photo attachment, and crime association.
+4. Verify Evidence upload, image/video/PDF preview, and chain of custody move log.
+5. Verify Investigation case diary entry and officer assignment.
+6. Verify Officer performance roster and active workload tracking.
+7. Verify Interactive GIS Map with markers and popups.
+8. Verify Recharts analytics dashboard rendering real backend stats.
+9. Verify Audit log filtering and action tracking.
