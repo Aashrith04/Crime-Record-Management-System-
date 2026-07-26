@@ -1,6 +1,7 @@
 # Enterprise Crime Record Management System (CRMS)
 
 [![CI/CD Pipeline](https://github.com/police-dept/crms/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/police-dept/crms/actions)
+
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110.0-009688.svg?style=flat&logo=FastAPI&logoColor=white)](https://fastapi.tiangolo.com)
 [![Next.js](https://img.shields.io/badge/Next.js-14.0-000000.svg?style=flat&logo=Next.js&logoColor=white)](https://nextjs.org)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15.0-336791.svg?style=flat&logo=PostgreSQL&logoColor=white)](https://www.postgresql.org)
