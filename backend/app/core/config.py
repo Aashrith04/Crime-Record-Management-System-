@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite:///./crms_dev.db"
 
+    # Redis Caching & Revocation Store
+    REDIS_URL: str = "redis://localhost:6379/0"
+
     # Security
     SECRET_KEY: str = "crms_enterprise_super_secret_jwt_key_change_in_production_min_32_bytes"
     JWT_ALGORITHM: str = "HS256"

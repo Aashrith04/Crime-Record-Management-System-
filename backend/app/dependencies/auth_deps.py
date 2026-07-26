@@ -4,6 +4,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.exceptions import ForbiddenException, UnauthorizedException
+from app.core.redis import is_token_revoked
 from app.core.security import decode_token
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
@@ -14,6 +15,9 @@ def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ) -> User:
+    if is_token_revoked(token):
+        raise UnauthorizedException("Token has been revoked.")
+
     payload = decode_token(token)
     if not payload or payload.get("type") != "access":
         raise UnauthorizedException("Invalid or expired access token.")

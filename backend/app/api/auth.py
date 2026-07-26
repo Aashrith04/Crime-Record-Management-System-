@@ -54,3 +54,21 @@ def get_current_user_profile(
         message="User profile retrieved.",
         data=UserRead.model_validate(current_user)
     )
+
+@router.post("/logout", response_model=StandardResponse[dict])
+def logout_user(
+    request: Request,
+    current_user: User = Depends(get_current_user)
+):
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+        from app.core.redis import revoke_token
+        revoke_token(token)
+
+    return StandardResponse(
+        success=True,
+        message="Logout successful. Token invalidated.",
+        data={"revoked": True}
+    )
+

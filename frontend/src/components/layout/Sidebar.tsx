@@ -19,7 +19,9 @@ import {
   ShieldCheck,
   Briefcase,
   UserCheck2,
-  Settings
+  Settings,
+  Sparkles,
+  Network
 } from "lucide-react";
 import { useAuth } from "@/providers/AuthProvider";
 
@@ -35,6 +37,8 @@ const navItems = [
   { label: "Officer Roster", href: "/officers", icon: BadgeAlert },
   { label: "GIS Crime Map", href: "/map", icon: MapPin },
   { label: "Department AI", href: "/ai-assistant", icon: BrainCircuit },
+  { label: "AI Dashboard", href: "/ai-dashboard", icon: Sparkles },
+  { label: "Enterprise Intelligence", href: "/intelligence", icon: Network },
   { label: "Analytics & Trends", href: "/analytics", icon: BarChart3 },
   { label: "System Audit Logs", href: "/logs", icon: History },
   { label: "Settings", href: "/settings", icon: Settings },

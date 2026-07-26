@@ -1,270 +1,217 @@
 "use client";
 
 import React, { useState } from "react";
-import { BrainCircuit, Sparkles, Search, FileText, AlertTriangle, UserCheck } from "lucide-react";
-import { api } from "@/services/api";
+import { useMutation } from "@tanstack/react-query";
+import { BrainCircuit, Send, Sparkles, Shield, Tag, ExternalLink, ChevronDown, ChevronUp, Bot, User as UserIcon, Loader2, AlertCircle } from "lucide-react";
+import { aiService, AIChatResponseData } from "@/services/aiService";
+import { useAuth } from "@/providers/AuthProvider";
+
+interface Message {
+  id: string;
+  sender: "user" | "assistant";
+  text: string;
+  timestamp: string;
+  responseMeta?: AIChatResponseData;
+}
 
 export default function AIAssistantPage() {
-  const [activeTab, setActiveTab] = useState<"summarizer" | "predictor" | "offenders">("summarizer");
-
-  // Summarizer State
-  const [firNumber, setFirNumber] = useState("FIR-2026-1001");
-  const [firResult, setFirResult] = useState<any>(null);
-  const [loadingSummarizer, setLoadingSummarizer] = useState(false);
-
-  // Predictor State
-  const [crimeType, setCrimeType] = useState("Robbery");
-  const [description, setDescription] = useState("Suspects used firearm to breach store vault at midnight.");
-  const [predictionResult, setPredictionResult] = useState<any>(null);
-  const [loadingPredictor, setLoadingPredictor] = useState(false);
-
-  // Offender State
-  const [offenderQuery, setOffenderQuery] = useState("Robbery suspect with scar");
-  const [offendersResult, setOffendersResult] = useState<any[]>([]);
-  const [loadingOffenders, setLoadingOffenders] = useState(false);
-
-  const handleSummarize = async () => {
-    setLoadingSummarizer(true);
-    try {
-      const res = await api.post("/ai/summarize-fir", { fir_number: firNumber });
-      setFirResult(res.data?.data);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingSummarizer(false);
+  const { user } = useAuth();
+  const [prompt, setPrompt] = useState("");
+  const [conversationId, setConversationId] = useState<string | undefined>(undefined);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: "init",
+      sender: "assistant",
+      text: "Greetings Officer. I am CRMS Law Enforcement AI Copilot. I analyze police databases, FIR records, evidence lockers, and officer rosters. How may I assist your investigation today?",
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
+  ]);
+  const [expandedReasoning, setExpandedReasoning] = useState<Record<string, boolean>>({});
+
+  const chatMutation = useMutation({
+    mutationFn: (text: string) => aiService.chatAssistant(text, conversationId),
+    onSuccess: (res) => {
+      const data = res.data;
+      if (data?.conversation_id) setConversationId(data.conversation_id);
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: String(Date.now()),
+          sender: "assistant",
+          text: data.answer,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          responseMeta: data
+        }
+      ]);
+    }
+  });
+
+  const handleSend = (textToSend?: string) => {
+    const text = textToSend || prompt;
+    if (!text.trim() || chatMutation.isPending) return;
+
+    const userMsg: Message = {
+      id: String(Date.now()),
+      sender: "user",
+      text: text,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    setMessages((prev) => [...prev, userMsg]);
+    if (!textToSend) setPrompt("");
+    chatMutation.mutate(text);
   };
 
-  const handlePredict = async () => {
-    setLoadingPredictor(true);
-    try {
-      const res = await api.post("/ai/predict-severity", {
-        crime_type: crimeType,
-        description,
-        location_name: "Central Sector"
-      });
-      setPredictionResult(res.data?.data);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingPredictor(false);
-    }
+  const toggleReasoning = (msgId: string) => {
+    setExpandedReasoning((prev) => ({ ...prev, [msgId]: !prev[msgId] }));
   };
 
-  const handleSearchOffenders = async () => {
-    setLoadingOffenders(true);
-    try {
-      const res = await api.post("/ai/repeat-offenders", { query: offenderQuery });
-      setOffendersResult(res.data?.data || []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingOffenders(false);
-    }
-  };
+  const presets = [
+    "Summarize Crime CR-2026-1001",
+    "Show repeat offenders near Sector 4",
+    "List pending evidence in Locker A-1",
+    "Which officer handled similar cases?"
+  ];
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-          <BrainCircuit className="w-6 h-6 text-cyan-400" />
-          <span>Law Enforcement AI Copilot & NLP Intelligence</span>
-        </h1>
-        <p className="text-xs text-slate-400 mt-1">AI-driven automated FIR summarizer, crime severity risk scoring, and repeat offender pattern recognition.</p>
+    <div className="h-[calc(100vh-6rem)] flex flex-col space-y-4">
+      {/* Page Header */}
+      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <h1 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+            <BrainCircuit className="w-5 h-5 text-cyan-400" />
+            <span>CRMS Investigation AI Copilot</span>
+          </h1>
+          <p className="text-xs text-slate-400 mt-1">Grounding responses exclusively on active police database records & FIR registries.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="px-2.5 py-1 rounded-full bg-cyan-950 text-cyan-400 text-xs font-mono border border-cyan-500/30">
+            Engine: Baseline RAG Copilot v1.0
+          </span>
+        </div>
       </div>
 
-      {/* Tabs Selector */}
-      <div className="flex border-b border-slate-800 gap-2 text-xs font-medium">
-        <button
-          onClick={() => setActiveTab("summarizer")}
-          className={`px-4 py-2.5 border-b-2 flex items-center gap-2 transition ${
-            activeTab === "summarizer" ? "border-cyan-400 text-cyan-400 bg-cyan-950/20" : "border-transparent text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <FileText className="w-4 h-4" />
-          <span>FIR Summarizer</span>
-        </button>
-        <button
-          onClick={() => setActiveTab("predictor")}
-          className={`px-4 py-2.5 border-b-2 flex items-center gap-2 transition ${
-            activeTab === "predictor" ? "border-cyan-400 text-cyan-400 bg-cyan-950/20" : "border-transparent text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <AlertTriangle className="w-4 h-4" />
-          <span>Severity Risk Predictor</span>
-        </button>
-        <button
-          onClick={() => setActiveTab("offenders")}
-          className={`px-4 py-2.5 border-b-2 flex items-center gap-2 transition ${
-            activeTab === "offenders" ? "border-cyan-400 text-cyan-400 bg-cyan-950/20" : "border-transparent text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <UserCheck className="w-4 h-4" />
-          <span>Repeat Offender Matcher</span>
-        </button>
-      </div>
-
-      {/* Tab 1: FIR Summarizer */}
-      {activeTab === "summarizer" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-[#0b132b] border border-slate-800 rounded-xl p-5 space-y-4">
-            <h2 className="text-sm font-bold text-slate-200">Summarize Registered FIR Record</h2>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Enter FIR Number</label>
-              <input
-                type="text"
-                value={firNumber}
-                onChange={(e) => setFirNumber(e.target.value)}
-                placeholder="e.g. FIR-2026-1001"
-                className="w-full bg-[#1c2541]/60 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-100 font-mono"
-              />
+      {/* Main Chat Conversation Container */}
+      <div className="flex-1 bg-[#0b132b] border border-slate-800 rounded-2xl p-4 overflow-y-auto space-y-4 shadow-xl">
+        {messages.map((msg) => (
+          <div
+            key={msg.id}
+            className={`flex gap-3 text-xs max-w-3xl ${msg.sender === "user" ? "ml-auto flex-row-reverse" : ""}`}
+          >
+            {/* Avatar */}
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold shrink-0 border ${
+              msg.sender === "user" ? "bg-cyan-600/20 text-cyan-400 border-cyan-500/40" : "bg-blue-600/20 text-blue-400 border-blue-500/40"
+            }`}>
+              {msg.sender === "user" ? <UserIcon className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
             </div>
-            <button
-              onClick={handleSummarize}
-              disabled={loadingSummarizer}
-              className="w-full py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>{loadingSummarizer ? "Processing FIR..." : "Execute AI NLP Summary"}</span>
-            </button>
-          </div>
 
-          <div className="bg-[#0b132b] border border-slate-800 rounded-xl p-5">
-            <h2 className="text-sm font-bold text-slate-200 mb-3">AI Intelligence Output</h2>
-            {firResult ? (
-              <div className="space-y-3 text-xs">
-                <div className="p-3 bg-[#1c2541]/50 rounded-lg border border-slate-800">
-                  <p className="text-slate-400 text-[10px] uppercase">Incident Narrative</p>
-                  <p className="text-slate-200 font-medium mt-1">{firResult.key_incident_summary}</p>
+            {/* Content Bubble */}
+            <div className="space-y-2 flex-1">
+              <div className={`p-4 rounded-2xl border ${
+                msg.sender === "user" 
+                  ? "bg-cyan-600/20 border-cyan-500/30 text-slate-100 rounded-tr-none" 
+                  : "bg-[#1c2541]/70 border-slate-800 text-slate-200 rounded-tl-none shadow-md"
+              }`}>
+                <div className="flex justify-between items-center text-[10px] text-slate-400 mb-1">
+                  <span className="font-bold uppercase tracking-wider">{msg.sender === "user" ? user?.full_name || "Officer" : "AI Copilot"}</span>
+                  <span className="font-mono">{msg.timestamp}</span>
                 </div>
-                <div className="p-3 bg-[#1c2541]/50 rounded-lg border border-slate-800">
-                  <p className="text-slate-400 text-[10px] uppercase">Calculated Threat Risk</p>
-                  <p className="text-rose-400 font-bold mt-1 font-mono">{firResult.risk_level}</p>
-                </div>
-                <div className="p-3 bg-[#1c2541]/50 rounded-lg border border-slate-800">
-                  <p className="text-slate-400 text-[10px] uppercase">Suggested Investigative Action Plan</p>
-                  <ul className="list-disc list-inside text-cyan-300 mt-1 space-y-1">
-                    {firResult.suggested_action_plan?.map((act: string, idx: number) => (
-                      <li key={idx}>{act}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-slate-500">Run FIR summarizer to view AI legal analysis.</p>
-            )}
-          </div>
-        </div>
-      )}
+                <p className="leading-relaxed whitespace-pre-wrap">{msg.text}</p>
 
-      {/* Tab 2: Severity Risk Predictor */}
-      {activeTab === "predictor" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-[#0b132b] border border-slate-800 rounded-xl p-5 space-y-4 text-xs">
-            <h2 className="text-sm font-bold text-slate-200">Predict Crime Incident Severity</h2>
-            <div>
-              <label className="block text-slate-400 mb-1">Crime Type</label>
-              <select
-                value={crimeType}
-                onChange={(e) => setCrimeType(e.target.value)}
-                className="w-full bg-[#1c2541]/60 border border-slate-700 rounded-lg px-3 py-2 text-slate-100"
-              >
-                <option value="Robbery">Robbery</option>
-                <option value="Assault">Assault</option>
-                <option value="Cybercrime">Cybercrime</option>
-                <option value="Homicide">Homicide</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-slate-400 mb-1">Incident Narrative Description</label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-                className="w-full bg-[#1c2541]/60 border border-slate-700 rounded-lg px-3 py-2 text-slate-100"
-              />
-            </div>
-            <button
-              onClick={handlePredict}
-              disabled={loadingPredictor}
-              className="w-full py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>{loadingPredictor ? "Calculating..." : "Predict Risk & Severity"}</span>
-            </button>
-          </div>
-
-          <div className="bg-[#0b132b] border border-slate-800 rounded-xl p-5">
-            <h2 className="text-sm font-bold text-slate-200 mb-3">Predicted Risk Matrix</h2>
-            {predictionResult ? (
-              <div className="space-y-3 text-xs">
-                <div className="p-3 bg-[#1c2541]/50 rounded-lg border border-slate-800">
-                  <p className="text-slate-400 text-[10px] uppercase">Predicted Severity</p>
-                  <p className="text-rose-400 font-bold text-base font-mono">{predictionResult.predicted_severity}</p>
-                </div>
-                <div className="p-3 bg-[#1c2541]/50 rounded-lg border border-slate-800">
-                  <p className="text-slate-400 text-[10px] uppercase">AI Model Confidence Score</p>
-                  <p className="text-cyan-400 font-bold font-mono">{(predictionResult.confidence_score * 100).toFixed(1)}%</p>
-                </div>
-                <div className="p-3 bg-[#1c2541]/50 rounded-lg border border-slate-800">
-                  <p className="text-slate-400 text-[10px] uppercase">Identified Threat Factors</p>
-                  <ul className="list-disc list-inside text-amber-300 mt-1 space-y-1">
-                    {predictionResult.risk_factors?.map((rf: string, idx: number) => (
-                      <li key={idx}>{rf}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-slate-500">Submit crime details to predict severity score.</p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Tab 3: Repeat Offender Matcher */}
-      {activeTab === "offenders" && (
-        <div className="space-y-4">
-          <div className="bg-[#0b132b] border border-slate-800 rounded-xl p-5 space-y-3">
-            <h2 className="text-sm font-bold text-slate-200">Natural Language Repeat Offender Search</h2>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={offenderQuery}
-                onChange={(e) => setOffenderQuery(e.target.value)}
-                placeholder='e.g. "Robbery suspect with scar"'
-                className="flex-1 bg-[#1c2541]/60 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-100"
-              />
-              <button
-                onClick={handleSearchOffenders}
-                disabled={loadingOffenders}
-                className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs flex items-center gap-2"
-              >
-                <Search className="w-4 h-4" />
-                <span>Match Criminals</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="bg-[#0b132b] border border-slate-800 rounded-xl p-5">
-            <h2 className="text-sm font-bold text-slate-200 mb-3">Matching Offender Profiles</h2>
-            {offendersResult.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {offendersResult.map((o, idx) => (
-                  <div key={idx} className="p-3 bg-[#1c2541]/40 border border-slate-800 rounded-lg text-xs space-y-1">
-                    <p className="font-bold text-cyan-400">{o.full_name} <span className="text-slate-400">({o.alias || "No Alias"})</span></p>
-                    <p className="text-slate-300">Similarity Match: <span className="text-emerald-400 font-mono">{(o.similarity_score * 100).toFixed(0)}%</span></p>
-                    <p className="text-slate-400 font-mono text-[11px]">Linked Past Offenses: {o.past_crimes_count}</p>
+                {/* Referenced Database Records Badges */}
+                {msg.responseMeta?.referenced_records && msg.responseMeta.referenced_records.length > 0 && (
+                  <div className="pt-3 border-t border-slate-800/80 mt-2 space-y-1.5">
+                    <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider font-bold">Referenced Records:</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {msg.responseMeta.referenced_records.map((rec, i) => (
+                        <span key={i} className="px-2 py-0.5 rounded bg-black/50 border border-slate-700 text-[10px] text-slate-300 font-mono flex items-center gap-1">
+                          <Tag className="w-2.5 h-2.5 text-cyan-400" />
+                          <span>{rec.type}: {rec.crime_number || rec.fir_number || rec.evidence_number || rec.name}</span>
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                ))}
+                )}
               </div>
-            ) : (
-              <p className="text-xs text-slate-500">No repeat offender profiles matched yet.</p>
-            )}
+
+              {/* Explainability & Confidence Meta Card */}
+              {msg.responseMeta && (
+                <div className="bg-[#1c2541]/40 border border-slate-800 rounded-xl p-3 text-[11px] space-y-2">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2 font-mono">
+                      <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
+                        {msg.responseMeta.confidence.confidence_percentage}% {msg.responseMeta.confidence.confidence_category} Confidence
+                      </span>
+                      <span className="text-slate-500 text-[10px]">Latency: {msg.responseMeta.confidence.processing_time_ms}ms</span>
+                    </div>
+
+                    <button
+                      onClick={() => toggleReasoning(msg.id)}
+                      className="text-cyan-400 hover:underline flex items-center gap-1 text-[10px]"
+                    >
+                      <span>{expandedReasoning[msg.id] ? "Hide Explainability" : "Explain AI Finding"}</span>
+                      {expandedReasoning[msg.id] ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    </button>
+                  </div>
+
+                  {expandedReasoning[msg.id] && (
+                    <div className="pt-2 border-t border-slate-800 space-y-1 text-slate-300">
+                      <p><span className="text-cyan-400 font-bold">Reasoning:</span> {msg.responseMeta.explainability.reasoning_summary}</p>
+                      <p><span className="text-cyan-400 font-bold">Explanation:</span> {msg.responseMeta.explainability.explanation}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
+        ))}
+
+        {chatMutation.isPending && (
+          <div className="flex gap-3 text-xs">
+            <div className="w-8 h-8 rounded-full bg-blue-600/20 text-blue-400 border border-blue-500/40 flex items-center justify-center font-bold">
+              <Loader2 className="w-4 h-4 animate-spin" />
+            </div>
+            <div className="bg-[#1c2541]/70 border border-slate-800 rounded-2xl p-4 text-slate-400 italic">
+              Retrieving context from database & analyzing investigation records...
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Preset Suggestions & Input Area */}
+      <div className="space-y-2">
+        <div className="flex flex-wrap gap-2 text-xs">
+          {presets.map((preset) => (
+            <button
+              key={preset}
+              onClick={() => handleSend(preset)}
+              className="px-3 py-1 rounded-lg bg-[#0b132b] hover:bg-slate-800 text-slate-300 border border-slate-800 transition font-mono text-[11px] flex items-center gap-1"
+            >
+              <Sparkles className="w-3 h-3 text-cyan-400" />
+              <span>{preset}</span>
+            </button>
+          ))}
         </div>
-      )}
+
+        <div className="bg-[#0b132b] border border-slate-800 rounded-xl p-2 flex items-center gap-2">
+          <input
+            type="text"
+            placeholder="Ask AI Copilot (e.g. Summarize FIR-2026-1001, Show repeat offenders)..."
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            className="flex-1 bg-transparent px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none"
+          />
+          <button
+            onClick={() => handleSend()}
+            disabled={!prompt.trim() || chatMutation.isPending}
+            className="p-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white disabled:opacity-40 transition shadow-md"
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

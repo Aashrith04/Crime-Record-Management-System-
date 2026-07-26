@@ -2,9 +2,9 @@
 
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { 
-  FolderArchive, Plus, Search, Eye, FileText, Image as ImageIcon, Video, 
-  History, Barcode, X, ArrowRightLeft, Edit2, Trash2, RotateCcw, Upload, 
+import {
+  FolderArchive, Plus, Search, Eye, FileText, Image as ImageIcon, Video,
+  History, Barcode, X, ArrowRightLeft, Edit2, Trash2, RotateCcw, Upload,
   CheckCircle2, Download, ExternalLink, Loader2
 } from "lucide-react";
 import { evidenceService } from "@/services/evidenceService";
@@ -63,7 +63,7 @@ export default function EvidenceLockerPage() {
 
     setSelectedFile(file);
     if (!fileName) setFileName(file.name);
-    
+
     if (file.type.startsWith("image/")) setFileType("image");
     else if (file.type.startsWith("video/")) setFileType("video");
     else if (file.type.includes("pdf")) setFileType("pdf");
@@ -226,9 +226,8 @@ export default function EvidenceLockerPage() {
         <div className="flex flex-wrap gap-2 items-center">
           <button
             onClick={() => setShowDeleted(!showDeleted)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition border ${
-              showDeleted ? "bg-amber-500/10 text-amber-400 border-amber-500/30" : "bg-[#1c2541]/50 text-slate-400 border-slate-700 hover:text-slate-200"
-            }`}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition border ${showDeleted ? "bg-amber-500/10 text-amber-400 border-amber-500/30" : "bg-[#1c2541]/50 text-slate-400 border-slate-700 hover:text-slate-200"
+              }`}
           >
             {showDeleted ? "Viewing Deleted Evidences" : "View Active Evidences"}
           </button>

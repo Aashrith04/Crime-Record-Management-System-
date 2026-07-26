@@ -63,6 +63,7 @@ export interface Crime {
   is_deleted?: boolean;
   assigned_officer?: User;
   timeline_entries?: CrimeTimeline[];
+  evidences?: any[];
 }
 
 export interface FIR {

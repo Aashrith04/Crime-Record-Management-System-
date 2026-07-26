@@ -2,6 +2,11 @@ import os
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
 from app.api.router import api_router
 from app.core.config import settings
 from app.core.exceptions import CustomAPIException, custom_exception_handler, generic_exception_handler
@@ -9,6 +14,8 @@ from app.core.logging import setup_logging
 from app.seed import seed_database
 
 setup_logging()
+
+limiter = Limiter(key_func=get_remote_address, default_limits=["300/minute"])
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -18,6 +25,16 @@ app = FastAPI(
     redoc_url="/redoc",
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Prometheus Metrics Instrumentator
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator
+    Instrumentator().instrument(app).expose(app, endpoint="/metrics", tags=["Observability"])
+except Exception as e:
+    print(f"Prometheus instrumentation warning: {e}")
 
 # Security Headers Middleware
 @app.middleware("http")

@@ -67,3 +67,34 @@ build/
 # User uploaded evidence
 backend/uploads/*
 !backend/uploads/.gitkeep
+# =========================
+# Python Tooling
+# =========================
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.pytype/
+.tox/
+.nox/
+
+# =========================
+# Jupyter
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# VS Code Test Artifacts
+# =========================
+.history/
+
+# =========================
+# Runtime
+# =========================
+*.pid
+
+# =========================
+# macOS Resource Forks
+# =========================
+._*
+# TypeScript
+*.tsbuildinfo

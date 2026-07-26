@@ -2,13 +2,15 @@
 
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { FileText, Printer, Download, Eye, Plus, ShieldCheck, Search, Trash2, X, Inbox, Edit2, RotateCcw } from "lucide-react";
+import { FileText, Printer, Download, Eye, Plus, ShieldCheck, Search, Trash2, X, Inbox, Edit2, RotateCcw, BrainCircuit, Sparkles, Loader2 } from "lucide-react";
 import { firService } from "@/services/firService";
 import { crimeService } from "@/services/crimeService";
+import { aiService, FIRSummaryResponseData } from "@/services/aiService";
 import { FIR, Crime } from "@/types";
 import { useToast } from "@/components/ui/Toast";
 import { TableSkeleton } from "@/components/ui/Skeleton";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ExportButtons } from "@/components/ui/ExportButtons";
 
 export default function FIRPage() {
   const queryClient = useQueryClient();
@@ -17,6 +19,7 @@ export default function FIRPage() {
   const [showDeleted, setShowDeleted] = useState(false);
   const [page, setPage] = useState(1);
   const [selectedFIR, setSelectedFIR] = useState<FIR | null>(null);
+  const [aiSummaryFIR, setAiSummaryFIR] = useState<FIRSummaryResponseData | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [firToEdit, setFirToEdit] = useState<FIR | null>(null);
   const [firToDelete, setFirToDelete] = useState<FIR | null>(null);
@@ -59,7 +62,7 @@ export default function FIRPage() {
       queryClient.invalidateQueries({ queryKey: ["firs"] });
       setIsCreateModalOpen(false);
       resetForm();
-      showToast("FIR registered successfully under CrPC.", "success");
+      showToast("FIR registered successfully under CrPC 154.", "success");
     },
     onError: (err: any) => {
       showToast(err.response?.data?.message || "Failed to register FIR.", "error");
@@ -80,7 +83,22 @@ export default function FIRPage() {
       queryClient.invalidateQueries({ queryKey: ["firs"] });
       setFirToEdit(null);
       resetForm();
-      showToast("FIR document updated successfully.", "success");
+      showToast("FIR record updated successfully.", "success");
+    },
+    onError: (err: any) => {
+      showToast(err.response?.data?.message || "Failed to update FIR.", "error");
+    }
+  });
+
+  // AI FIR Summarization Mutation
+  const aiSummarizeMutation = useMutation({
+    mutationFn: (firNum: string) => aiService.summarizeFIR(firNum),
+    onSuccess: (res) => {
+      setAiSummaryFIR(res.data);
+      showToast("FIR summarized using AI NLP analyzer.", "success");
+    },
+    onError: (err: any) => {
+      showToast(err.response?.data?.message || "AI Summarization failed.", "error");
     }
   });
 
@@ -89,7 +107,7 @@ export default function FIRPage() {
     mutationFn: (publicId: string) => firService.deleteFIR(publicId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["firs"] });
-      showToast("FIR deleted from registry.", "info");
+      showToast("FIR record deleted.", "info");
       setFirToDelete(null);
     }
   });
@@ -99,7 +117,7 @@ export default function FIRPage() {
     mutationFn: (publicId: string) => firService.restoreFIR(publicId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["firs"] });
-      showToast("FIR restored to active registry.", "success");
+      showToast("FIR record restored.", "success");
     }
   });
 
@@ -125,26 +143,29 @@ export default function FIRPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-slate-100 flex items-center gap-2">
             <FileText className="w-5 h-5 text-cyan-400" />
             <span>First Information Report (FIR) Registry</span>
           </h1>
-          <p className="text-xs text-slate-400 mt-1">Official legal records registered under Code of Criminal Procedure (CrPC).</p>
+          <p className="text-xs text-slate-400 mt-1">Official state registry of FIRs registered under Code of Criminal Procedure (CrPC Section 154).</p>
         </div>
-        <button
-          onClick={() => {
-            setFirToEdit(null);
-            resetForm();
-            setIsCreateModalOpen(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs shadow-lg shadow-cyan-500/20 transition self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Register New FIR</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-3 self-start sm:self-auto">
+          <ExportButtons entity="firs" />
+          <button
+            onClick={() => {
+              setFirToEdit(null);
+              resetForm();
+              setIsCreateModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs shadow-lg shadow-cyan-500/20 transition"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Register New FIR</span>
+          </button>
+        </div>
       </div>
 
       {/* Search & Toggle Bar */}
@@ -205,7 +226,16 @@ export default function FIRPage() {
                       </span>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => aiSummarizeMutation.mutate(fir.fir_number)}
+                          disabled={aiSummarizeMutation.isPending}
+                          className="px-2 py-1 rounded bg-cyan-950 hover:bg-cyan-900 text-cyan-400 border border-cyan-500/30 font-medium text-[11px] inline-flex items-center gap-1"
+                          title="AI Summarize FIR"
+                        >
+                          <BrainCircuit className="w-3.5 h-3.5" />
+                          <span>AI Summary</span>
+                        </button>
                         <button
                           onClick={() => firService.downloadPDF(fir.public_id, fir.fir_number)}
                           className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-400"
@@ -218,28 +248,25 @@ export default function FIRPage() {
                           className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-cyan-400 font-medium text-[11px] inline-flex items-center gap-1"
                         >
                           <Eye className="w-3.5 h-3.5" />
-                          <span>View FIR</span>
+                          <span>View</span>
                         </button>
                         <button
                           onClick={() => openEditModal(fir)}
-                          className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-400"
-                          title="Edit FIR Document"
+                          className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-cyan-400"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         {showDeleted ? (
                           <button
                             onClick={() => restoreMutation.mutate(fir.public_id)}
-                            className="p-1.5 rounded bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-                            title="Restore Deleted FIR"
+                            className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-emerald-400"
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
                           </button>
                         ) : (
                           <button
                             onClick={() => setFirToDelete(fir)}
-                            className="p-1.5 rounded hover:bg-rose-500/10 text-slate-400 hover:text-rose-400"
-                            title="Delete FIR"
+                            className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-rose-400"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -254,33 +281,118 @@ export default function FIRPage() {
         )}
       </div>
 
+      {/* AI Summary Modal */}
+      {aiSummaryFIR && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0b132b] border border-cyan-500/40 rounded-2xl w-full max-w-xl p-6 relative shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <button onClick={() => setAiSummaryFIR(null)} className="absolute right-4 top-4 text-slate-400 hover:text-slate-200">
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                  <BrainCircuit className="w-5 h-5 text-cyan-400" />
+                  <span>AI Summary — {aiSummaryFIR.fir_number}</span>
+                </h2>
+                <p className="text-xs text-slate-400">Generated via Law Enforcement NLP Engine</p>
+              </div>
+              <span className="px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-mono font-bold">
+                {aiSummaryFIR.confidence.confidence_percentage}% {aiSummaryFIR.confidence.confidence_category} Confidence
+              </span>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div className="p-3 bg-[#1c2541]/60 rounded-xl border border-slate-800 space-y-1">
+                <h3 className="font-bold text-cyan-400 uppercase tracking-wider text-[11px]">Executive Summary</h3>
+                <p className="text-slate-200 leading-relaxed">{aiSummaryFIR.short_summary}</p>
+              </div>
+
+              <div className="p-3 bg-[#1c2541]/60 rounded-xl border border-slate-800 space-y-1">
+                <h3 className="font-bold text-cyan-400 uppercase tracking-wider text-[11px]">Detailed Investigation Narrative</h3>
+                <p className="text-slate-300 leading-relaxed">{aiSummaryFIR.detailed_summary}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-[#1c2541]/40 rounded-xl border border-slate-800 space-y-1">
+                  <h4 className="font-bold text-slate-300 text-[11px]">Extracted IPC Sections</h4>
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {aiSummaryFIR.extracted_ipc_sections.map((sec, i) => (
+                      <span key={i} className="px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-500/30 font-mono text-[10px]">{sec}</span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-3 bg-[#1c2541]/40 rounded-xl border border-slate-800 space-y-1">
+                  <h4 className="font-bold text-slate-300 text-[11px]">Key Individuals & Locations</h4>
+                  <p className="text-slate-400 text-[11px]">Persons: {aiSummaryFIR.key_individuals.join(", ")}</p>
+                  <p className="text-slate-400 text-[11px]">Location: {aiSummaryFIR.locations.join(", ")}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View FIR Details Modal */}
+      {selectedFIR && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0b132b] border border-slate-800 rounded-2xl w-full max-w-lg p-6 relative shadow-2xl space-y-4">
+            <button onClick={() => setSelectedFIR(null)} className="absolute right-4 top-4 text-slate-400 hover:text-slate-200">
+              <X className="w-5 h-5" />
+            </button>
+            <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-cyan-400" />
+              <span>{selectedFIR.fir_number}</span>
+            </h2>
+
+            <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-2 bg-[#1c2541]/50 p-3 rounded-lg border border-slate-800">
+                <div>
+                  <span className="text-slate-400">Complainant:</span>
+                  <p className="font-semibold text-slate-200">{selectedFIR.complainant_name}</p>
+                </div>
+                <div>
+                  <span className="text-slate-400">Contact:</span>
+                  <p className="font-semibold text-slate-200">{selectedFIR.complainant_contact}</p>
+                </div>
+              </div>
+
+              <div>
+                <span className="text-slate-400">Sections of Law:</span>
+                <p className="font-mono text-cyan-400 mt-0.5">{selectedFIR.sections_of_law}</p>
+              </div>
+
+              <div>
+                <span className="text-slate-400">Incident Details:</span>
+                <p className="text-slate-300 mt-1 whitespace-pre-wrap bg-[#1c2541]/30 p-3 rounded-lg border border-slate-800">{selectedFIR.incident_details}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Register / Edit FIR Modal */}
       {(isCreateModalOpen || firToEdit) && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0b132b] border border-slate-800 rounded-2xl w-full max-w-lg p-6 relative shadow-2xl space-y-4">
-            <button
-              onClick={() => {
-                setIsCreateModalOpen(false);
-                setFirToEdit(null);
-              }}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-200"
-            >
+          <div className="bg-[#0b132b] border border-slate-800 rounded-2xl w-full max-w-md p-6 relative shadow-2xl space-y-4">
+            <button onClick={() => { setIsCreateModalOpen(false); setFirToEdit(null); }} className="absolute right-4 top-4 text-slate-400 hover:text-slate-200">
               <X className="w-5 h-5" />
             </button>
             <h2 className="text-lg font-bold text-slate-100">
-              {firToEdit ? `Edit FIR - ${firToEdit.fir_number}` : "Register Official FIR Document"}
+              {firToEdit ? `Edit FIR - ${firToEdit.fir_number}` : "Register New FIR"}
             </h2>
 
             <div className="space-y-3 text-xs">
               {!firToEdit && (
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Select Crime Record</label>
+                  <label className="block text-slate-300 font-medium mb-1">Select Crime Incident</label>
                   <select
                     value={crimeId}
                     onChange={(e) => setCrimeId(Number(e.target.value))}
                     className="w-full bg-[#1c2541]/60 border border-slate-700 rounded-lg px-3 py-2 text-slate-100"
                   >
-                    <option value="">Select Associated Crime...</option>
+                    <option value="">Select Crime...</option>
                     {crimesList.map((c: Crime) => (
                       <option key={c.public_id} value={c.id}>
                         {c.crime_number} - {c.title}
@@ -291,10 +403,9 @@ export default function FIRPage() {
               )}
 
               <div>
-                <label className="block text-slate-300 font-medium mb-1">Complainant Full Name</label>
+                <label className="block text-slate-300 font-medium mb-1">Complainant Name</label>
                 <input
                   type="text"
-                  placeholder="Full Name"
                   value={complainantName}
                   onChange={(e) => setComplainantName(e.target.value)}
                   className="w-full bg-[#1c2541]/60 border border-slate-700 rounded-lg px-3 py-2 text-slate-100"
@@ -306,7 +417,6 @@ export default function FIRPage() {
                   <label className="block text-slate-300 font-medium mb-1">Contact Phone</label>
                   <input
                     type="text"
-                    placeholder="+91 9876543210"
                     value={complainantContact}
                     onChange={(e) => setComplainantContact(e.target.value)}
                     className="w-full bg-[#1c2541]/60 border border-slate-700 rounded-lg px-3 py-2 text-slate-100"
@@ -316,7 +426,6 @@ export default function FIRPage() {
                   <label className="block text-slate-300 font-medium mb-1">Sections of Law</label>
                   <input
                     type="text"
-                    placeholder="e.g. IPC 379, 420"
                     value={sectionsOfLaw}
                     onChange={(e) => setSectionsOfLaw(e.target.value)}
                     className="w-full bg-[#1c2541]/60 border border-slate-700 rounded-lg px-3 py-2 text-slate-100"
@@ -325,24 +434,9 @@ export default function FIRPage() {
               </div>
 
               <div>
-                <label className="block text-slate-300 font-medium mb-1">FIR Status</label>
-                <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                  className="w-full bg-[#1c2541]/60 border border-slate-700 rounded-lg px-3 py-2 text-slate-100"
-                >
-                  <option value="Registered">Registered</option>
-                  <option value="Under Review">Under Review</option>
-                  <option value="Verified">Verified</option>
-                  <option value="Closed">Closed</option>
-                </select>
-              </div>
-
-              <div>
                 <label className="block text-slate-300 font-medium mb-1">Complainant Address</label>
                 <input
                   type="text"
-                  placeholder="Address details"
                   value={complainantAddress}
                   onChange={(e) => setComplainantAddress(e.target.value)}
                   className="w-full bg-[#1c2541]/60 border border-slate-700 rounded-lg px-3 py-2 text-slate-100"
@@ -350,10 +444,9 @@ export default function FIRPage() {
               </div>
 
               <div>
-                <label className="block text-slate-300 font-medium mb-1">Incident Statement & Details</label>
+                <label className="block text-slate-300 font-medium mb-1">Incident Details & Allegations</label>
                 <textarea
                   rows={3}
-                  placeholder="Complainant statement and incident details..."
                   value={incidentDetails}
                   onChange={(e) => setIncidentDetails(e.target.value)}
                   className="w-full bg-[#1c2541]/60 border border-slate-700 rounded-lg px-3 py-2 text-slate-100"
@@ -361,81 +454,14 @@ export default function FIRPage() {
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
+                <button onClick={() => { setIsCreateModalOpen(false); setFirToEdit(null); }} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg">Cancel</button>
                 <button
-                  onClick={() => {
-                    setIsCreateModalOpen(false);
-                    setFirToEdit(null);
-                  }}
-                  className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  disabled={firToEdit ? updateMutation.isPending : (!crimeId || !complainantName || !incidentDetails || createMutation.isPending)}
+                  disabled={createMutation.isPending || updateMutation.isPending || (!firToEdit && (!crimeId || !complainantName))}
                   onClick={() => firToEdit ? updateMutation.mutate() : createMutation.mutate()}
-                  className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-medium shadow-md"
+                  className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-medium rounded-lg shadow-md"
                 >
-                  {firToEdit ? (updateMutation.isPending ? "Saving..." : "Save Changes") : (createMutation.isPending ? "Registering..." : "Register FIR")}
+                  {firToEdit ? "Save Changes" : "Register FIR"}
                 </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Official FIR View Modal */}
-      {selectedFIR && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0b132b] border border-cyan-500/40 rounded-2xl w-full max-w-2xl p-6 relative shadow-2xl space-y-4">
-            <div className="flex justify-between items-start border-b border-slate-800 pb-4">
-              <div className="flex items-center gap-3">
-                <ShieldCheck className="w-8 h-8 text-cyan-400" />
-                <div>
-                  <h2 className="text-sm font-bold text-slate-100 uppercase tracking-widest">FORM I - FIRST INFORMATION REPORT</h2>
-                  <p className="text-[10px] text-cyan-400 font-mono">Under Section 154 Cr.P.C. • Police Dept</p>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => firService.downloadPDF(selectedFIR.public_id, selectedFIR.fir_number)}
-                  className="px-3 py-1.5 rounded bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium flex items-center gap-1"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download PDF</span>
-                </button>
-                <button onClick={() => setSelectedFIR(null)} className="p-1.5 rounded bg-slate-800 text-slate-200">
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-4 text-xs font-mono text-slate-300">
-              <div className="grid grid-cols-2 gap-4 bg-[#1c2541]/40 p-3 rounded-lg border border-slate-800">
-                <div>
-                  <p className="text-[10px] text-slate-500 uppercase">FIR NUMBER</p>
-                  <p className="text-cyan-400 font-bold">{selectedFIR.fir_number}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-slate-500 uppercase">REGISTERED DATE</p>
-                  <p className="text-slate-200">{new Date(selectedFIR.registered_at).toLocaleString()}</p>
-                </div>
-              </div>
-
-              <div className="p-3 bg-[#1c2541]/40 rounded-lg border border-slate-800">
-                <p className="text-[10px] text-slate-500 uppercase mb-1">Complainant Information</p>
-                <p><span className="text-slate-400">Name:</span> {selectedFIR.complainant_name}</p>
-                <p><span className="text-slate-400">Contact:</span> {selectedFIR.complainant_contact}</p>
-                <p><span className="text-slate-400">Address:</span> {selectedFIR.complainant_address || "N/A"}</p>
-              </div>
-
-              <div className="p-3 bg-[#1c2541]/40 rounded-lg border border-slate-800">
-                <p className="text-[10px] text-slate-500 uppercase mb-1">Acts & Sections of Law</p>
-                <p className="text-cyan-300 font-bold">{selectedFIR.sections_of_law}</p>
-              </div>
-
-              <div className="p-3 bg-[#1c2541]/40 rounded-lg border border-slate-800">
-                <p className="text-[10px] text-slate-500 uppercase mb-1">Statement of Incident Details</p>
-                <p className="text-slate-200 leading-relaxed">{selectedFIR.incident_details}</p>
               </div>
             </div>
           </div>
@@ -446,7 +472,7 @@ export default function FIRPage() {
       <ConfirmDialog
         isOpen={!!firToDelete}
         title="Delete FIR Record"
-        message={`Are you sure you want to delete FIR ${firToDelete?.fir_number}?`}
+        message={`Are you sure you want to soft delete FIR record ${firToDelete?.fir_number}?`}
         onConfirm={() => firToDelete && deleteMutation.mutate(firToDelete.public_id)}
         onCancel={() => setFirToDelete(null)}
       />

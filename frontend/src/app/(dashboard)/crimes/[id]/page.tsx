@@ -15,10 +15,13 @@ import {
   Users, 
   Plus, 
   ArrowLeft,
-  Briefcase
+  Briefcase,
+  BrainCircuit,
+  Sparkles
 } from "lucide-react";
 import { crimeService } from "@/services/crimeService";
 import { officerService } from "@/services/officerService";
+import { aiService } from "@/services/aiService";
 import { useToast } from "@/components/ui/Toast";
 import { DetailSkeleton } from "@/components/ui/Skeleton";
 
@@ -30,7 +33,7 @@ export default function CrimeDetailPage() {
 
   const publicId = params.id as string;
 
-  const [activeTab, setActiveTab] = useState<"overview" | "timeline" | "evidence" | "investigation">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "timeline" | "evidence" | "investigation" | "ai-recommendations">("overview");
   const [timelineTitle, setTimelineTitle] = useState("");
   const [timelineDesc, setTimelineDesc] = useState("");
   const [selectedOfficerId, setSelectedOfficerId] = useState<number | "">("");
@@ -49,6 +52,14 @@ export default function CrimeDetailPage() {
 
   const crime = crimeRes?.data;
   const officers = officersRes?.data?.items || [];
+
+  // Fetch AI Similar Case Recommendations
+  const { data: recsRes, isLoading: isLoadingRecs } = useQuery({
+    queryKey: ["similar-cases", publicId],
+    queryFn: () => aiService.getSimilarCases(publicId),
+    enabled: activeTab === "ai-recommendations",
+  });
+  const recommendations = recsRes?.data?.recommendations || [];
 
   // Status Change Mutation
   const statusMutation = useMutation({
@@ -180,7 +191,20 @@ export default function CrimeDetailPage() {
           onClick={() => setActiveTab("timeline")}
           className={`pb-2 transition ${activeTab === "timeline" ? "text-cyan-400 border-b-2 border-cyan-400 font-bold" : "hover:text-slate-200"}`}
         >
-          Crime Timeline ({crime.timeline_entries?.length || 0})
+          Case Timeline
+        </button>
+        <button
+          onClick={() => setActiveTab("evidence")}
+          className={`pb-2 transition ${activeTab === "evidence" ? "text-cyan-400 border-b-2 border-cyan-400 font-bold" : "hover:text-slate-200"}`}
+        >
+          Linked Evidence ({crime.evidences?.length || 0})
+        </button>
+        <button
+          onClick={() => setActiveTab("ai-recommendations")}
+          className={`pb-2 transition flex items-center gap-1.5 ${activeTab === "ai-recommendations" ? "text-cyan-400 border-b-2 border-cyan-400 font-bold" : "hover:text-slate-200"}`}
+        >
+          <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+          <span>AI Similar Cases</span>
         </button>
       </div>
 
@@ -268,6 +292,56 @@ export default function CrimeDetailPage() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Similar Case Recommendations Tab Content */}
+      {activeTab === "ai-recommendations" && (
+        <div className="space-y-4">
+          <div className="bg-[#0b132b] border border-cyan-500/30 rounded-xl p-5 shadow-xl space-y-3">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                  <BrainCircuit className="w-4 h-4 text-cyan-400" />
+                  <span>AI Modus Operandi & Case Similarity Recommendations</span>
+                </h3>
+                <p className="text-xs text-slate-400">Scanned historical incident database for matching patterns, shared evidence types, and location proximity.</p>
+              </div>
+              <span className="px-2.5 py-1 rounded bg-cyan-950 text-cyan-400 font-mono text-xs border border-cyan-500/30">
+                Source: {crime.crime_number}
+              </span>
+            </div>
+
+            {isLoadingRecs ? (
+              <p className="text-xs text-slate-400 py-6 text-center">Scanning database vector indices for similar cases...</p>
+            ) : recommendations.length === 0 ? (
+              <p className="text-xs text-slate-400 py-6 text-center">No similar criminal modus operandi patterns detected.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                {recommendations.map((rec: any, i: number) => (
+                  <div key={i} className="p-4 bg-[#1c2541]/40 border border-slate-800 hover:border-slate-700 rounded-xl space-y-2 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="font-mono text-cyan-400 font-bold text-sm">{rec.crime_number}</span>
+                      <span className="px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold text-[11px]">
+                        {Math.round(rec.similarity_score * 100)}% Match Score
+                      </span>
+                    </div>
+
+                    <h4 className="font-bold text-slate-200">{rec.title}</h4>
+
+                    <div className="space-y-1 text-[11px] pt-1">
+                      <p className="text-cyan-400 font-bold">Matching Reasons:</p>
+                      <ul className="list-disc list-inside text-slate-300 space-y-0.5">
+                        {rec.matching_reasons?.map((reason: string, rIdx: number) => (
+                          <li key={rIdx}>{reason}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
