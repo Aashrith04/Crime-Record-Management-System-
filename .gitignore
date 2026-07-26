@@ -63,3 +63,7 @@ build/
 # =========================
 *.tmp
 *.swp
+
+# User uploaded evidence
+backend/uploads/*
+!backend/uploads/.gitkeep
